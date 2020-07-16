@@ -13,7 +13,8 @@ import { ExportErrorFragment } from "@saleor/fragments/types/ExportErrorFragment
 import useModalDialogErrors from "@saleor/hooks/useModalDialogErrors";
 import useWizard from "@saleor/hooks/useWizard";
 import { buttonMessages } from "@saleor/intl";
-import { DialogProps } from "@saleor/types";
+import { SearchAttributes_search_edges_node } from "@saleor/searches/types/SearchAttributes";
+import { DialogProps, FetchMoreProps } from "@saleor/types";
 import {
   ExportProductsInput,
   ExportScope,
@@ -23,6 +24,7 @@ import getExportErrorMessage from "@saleor/utils/errors/export";
 import React from "react";
 import { FormattedMessage, useIntl } from "react-intl";
 
+import ProductExportDialogInfo from "./ProductExportDialogInfo";
 import ProductExportDialogSettings from "./ProductExportDialogSettings";
 
 export enum ProductExportStep {
@@ -52,17 +54,22 @@ function useSteps(): Array<Step<ProductExportStep>> {
 }
 
 const initialForm: ExportProductsInput = {
-  exportInfo: {},
+  exportInfo: {
+    attributes: [],
+    fields: []
+  },
   fileType: FileTypesEnum.CSV,
   scope: ExportScope.ALL
 };
 
 const ProductExportSteps = makeCreatorSteps<ProductExportStep>();
 
-export interface ProductExportDialogProps extends DialogProps {
+export interface ProductExportDialogProps extends DialogProps, FetchMoreProps {
+  attributes: SearchAttributes_search_edges_node[];
   confirmButtonState: ConfirmButtonTransitionState;
   errors: ExportErrorFragment[];
   selectedProducts: number;
+  onFetch: (query: string) => void;
   onSubmit: (data: ExportProductsInput) => void;
 }
 
@@ -72,12 +79,13 @@ const ProductExportDialog: React.FC<ProductExportDialogProps> = ({
   onClose,
   onSubmit,
   open,
-  selectedProducts
+  selectedProducts,
+  ...fetchMoreProps
 }) => {
-  const [step, { set: setStep }] = useWizard(ProductExportStep.SETTINGS, [
+  const [step, { next, prev, set: setStep }] = useWizard(
     ProductExportStep.INFO,
-    ProductExportStep.SETTINGS
-  ]);
+    [ProductExportStep.INFO, ProductExportStep.SETTINGS]
+  );
   const steps = useSteps();
   const dialogErrors = useModalDialogErrors(errors, open);
   const notFormErrors = dialogErrors.filter(err => !err.field);
@@ -100,6 +108,13 @@ const ProductExportDialog: React.FC<ProductExportDialogProps> = ({
                 steps={steps}
                 onStepClick={setStep}
               />
+              {step === ProductExportStep.INFO && (
+                <ProductExportDialogInfo
+                  data={data}
+                  onChange={change}
+                  {...fetchMoreProps}
+                />
+              )}
               {step === ProductExportStep.SETTINGS && (
                 <ProductExportDialogSettings
                   data={data}
@@ -121,19 +136,33 @@ const ProductExportDialog: React.FC<ProductExportDialogProps> = ({
             )}
 
             <DialogActions>
-              <Button onClick={onClose}>
-                <FormattedMessage {...buttonMessages.back} />
-              </Button>
-              <ConfirmButton
-                transitionState={confirmButtonState}
-                variant="contained"
-                type="submit"
-              >
-                <FormattedMessage
-                  defaultMessage="export products"
-                  description="export products to csv file, button"
-                />
-              </ConfirmButton>
+              {step === ProductExportStep.INFO && (
+                <Button onClick={onClose}>
+                  <FormattedMessage {...buttonMessages.cancel} />
+                </Button>
+              )}
+              {step === ProductExportStep.SETTINGS && (
+                <Button onClick={prev}>
+                  <FormattedMessage {...buttonMessages.back} />
+                </Button>
+              )}
+              {step === ProductExportStep.INFO && (
+                <Button color="primary" variant="contained" onClick={next}>
+                  <FormattedMessage {...buttonMessages.nextStep} />
+                </Button>
+              )}
+              {step === ProductExportStep.SETTINGS && (
+                <ConfirmButton
+                  transitionState={confirmButtonState}
+                  variant="contained"
+                  type="submit"
+                >
+                  <FormattedMessage
+                    defaultMessage="export products"
+                    description="export products to csv file, button"
+                  />
+                </ConfirmButton>
+              )}
             </DialogActions>
           </>
         )}
